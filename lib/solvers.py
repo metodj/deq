@@ -146,7 +146,7 @@ def broyden(f, x0, threshold, eps=1e-3, stop_mode="rel", ls=False, name="unknown
                    'rel': 1e8}
     lowest_step_dict = {'abs': 0,
                         'rel': 0}
-    nstep, lowest_xest, lowest_gx = 0, x_est, gx
+    nstep, lowest_xest, lowest_gx, xest_all = 0, x_est, gx, [x_est]
 
     while nstep < threshold:
         x_est, gx, delta_x, delta_gx, ite = line_search(update, x_est, gx, g, nstep=nstep, on=ls)
@@ -162,6 +162,7 @@ def broyden(f, x0, threshold, eps=1e-3, stop_mode="rel", ls=False, name="unknown
             if diff_dict[mode] < lowest_dict[mode]:
                 if mode == stop_mode: 
                     lowest_xest, lowest_gx = x_est.clone().detach(), gx.clone().detach()
+                    xest_all.append(lowest_xest)
                 lowest_dict[mode] = diff_dict[mode]
                 lowest_step_dict[mode] = nstep
 
@@ -195,7 +196,8 @@ def broyden(f, x0, threshold, eps=1e-3, stop_mode="rel", ls=False, name="unknown
             "abs_trace": trace_dict['abs'],
             "rel_trace": trace_dict['rel'],
             "eps": eps,
-            "threshold": threshold}
+            "threshold": threshold,
+            "all_preds": xest_all}
 
 
 def anderson(f, x0, m=6, lam=1e-4, threshold=50, eps=1e-3, stop_mode='rel', beta=1.0, **kwargs):
