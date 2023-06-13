@@ -120,7 +120,7 @@ def train(config, train_loader, model, criterion, optimizer, lr_scheduler, epoch
 
 
 def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_dir, tb_log_dir,
-             writer_dict=None, topk=(1,5), spectral_radius_mode=False, save_logits=False):
+             writer_dict=None, topk=(1,5), spectral_radius_mode=False, save_logits=True):
     batch_time = AverageMeter()
     losses = AverageMeter()
     spectral_radius_mode = spectral_radius_mode and (epoch % 10 == 0)
@@ -135,14 +135,15 @@ def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_d
 
     logits, targets = [], []
     with torch.no_grad():
-        end = time.time()
         # tk0 = tqdm(enumerate(val_loader), total=len(val_loader), position=0, leave=True)
         for i, (input, target) in enumerate(val_loader):
             # compute output
+            end = time.time()
             output, _, sradius, output_all = model(input, 
                                  train_step=(-1 if epoch < 0 else (lr_scheduler._step_count-1)),
                                  compute_jac_loss=False, spectral_radius_mode=spectral_radius_mode,
                                  writer=writer)
+            batch_time.update(time.time() - end)
             target = target.cuda(non_blocking=True)
             loss = criterion(output, target)
 
@@ -158,10 +159,8 @@ def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_d
             if spectral_radius_mode:
                 sradius = sradius.mean()
                 sradiuses.update(sradius.item(), input.size(0))
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+            
+            
 
     if spectral_radius_mode:
         logger.info(f"Spectral radius over validation set: {sradiuses.avg}")    
@@ -179,7 +178,7 @@ def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_d
             writer.add_scalar('stability/sradius', sradiuses.avg, epoch)
 
     if save_logits:
-        with open("cifar10_LARGE.pkl", "wb") as f:
+        with open("cifar10.pkl", "wb") as f:
             pickle.dump((logits, targets), f)
     
 
