@@ -82,6 +82,11 @@ def main():
 
     if config.TEST.MODEL_FILE:
         logger.info('=> loading model from {}'.format(config.TEST.MODEL_FILE))
+        state_dict = torch.load(config.TEST.MODEL_FILE)
+        # print('BANANA')
+        # print(state_dict.keys())
+        # print('KEKEc')
+        # print(model.state_dict().keys())
         model.load_state_dict(torch.load(config.TEST.MODEL_FILE))
     else:
         model_state_file = os.path.join(final_output_dir, 'final_state.pth.tar')

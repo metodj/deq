@@ -1,11 +1,11 @@
 GPUS: (0,1,2,3)
 LOG_DIR: 'log/'
-DATA_DIR: ''
+DATA_DIR: '../../../PoE/MSDNet-PyTorch/'
 OUTPUT_DIR: 'output/'
 WORKERS: 12
 PRINT_FREQ: 1000
 
-MODEL: 
+MODEL:
   NAME: mdeq
   NUM_LAYERS: 5
   NUM_CLASSES: 1000

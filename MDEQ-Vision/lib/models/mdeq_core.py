@@ -424,9 +424,12 @@ class MDEQNet(nn.Module):
         deq_mode = (train_step < 0) or (train_step >= self.pretrain_steps)
         
         # Multiscale Deep Equilibrium!
+        # print(f"DEQ mode: {deq_mode}, {self.num_layers}, {train_step}, {self.pretrain_steps}")
+        all_preds = []
         if not deq_mode:
             for layer_ind in range(self.num_layers): 
                 z1 = func(z1)
+                all_preds.append(z1)
             new_z1 = z1
 
             if self.training:
@@ -439,6 +442,7 @@ class MDEQNet(nn.Module):
                 result = self.f_solver(func, z1, threshold=f_thres, stop_mode=self.stop_mode, name="forward")
                 z1 = result['result']
             new_z1 = z1
+            # print(f"BANANA: {len(result['all_preds']), type(result['all_preds'][0]), result['all_preds'][0].shape, new_z1.shape}")
 
             if (not self.training) and spectral_radius_mode:
                 with torch.enable_grad():
@@ -458,9 +462,16 @@ class MDEQNet(nn.Module):
                                           threshold=b_thres, stop_mode=self.stop_mode, name="backward")
                     return result['result']
                 self.hook = new_z1.register_hook(backward_hook)
+            
+            all_preds = result['all_preds']
+
+        # print(len(all_preds), len(all_preds[0]), all_preds[0][0].shape, all_preds[0][1].shape)
                 
         y_list = self.iodrop(vec2list(new_z1, cutoffs))
-        return y_list, jac_loss.view(1,-1), sradius.view(-1,1)
+        y_list_all = [self.iodrop(vec2list(x, cutoffs)) for x in all_preds]
+        # print(len(y_list), y_list[0].shape, y_list[1].shape)
+        # print(len(y_list_all), len(y_list_all[0]), y_list_all[0][0].shape, y_list_all[0][1].shape)
+        return y_list, jac_loss.view(1,-1), sradius.view(-1,1), y_list_all
     
     def forward(self, x, train_step=-1, **kwargs):
         raise NotImplemented    # To be inherited & implemented by MDEQClsNet and MDEQSegNet (see mdeq.py)

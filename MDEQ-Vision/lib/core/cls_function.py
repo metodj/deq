@@ -16,6 +16,8 @@ sys.path.append("../")
 from utils.utils import save_checkpoint, AverageMeter
 import random
 from tqdm import tqdm
+import pickle
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +65,7 @@ def train(config, train_loader, model, criterion, optimizer, lr_scheduler, epoch
         delta_f_thres = torch.randint(-config.DEQ.RAND_F_THRES_DELTA,2,[]).item() if (config.DEQ.RAND_F_THRES_DELTA > 0 and compute_jac_loss) else 0
         f_thres = config.DEQ.F_THRES + delta_f_thres
         b_thres = config.DEQ.B_THRES
-        output, jac_loss, _ = model(input, train_step=(lr_scheduler._step_count-1), 
+        output, jac_loss, _, _ = model(input, train_step=(lr_scheduler._step_count-1), 
                                     compute_jac_loss=compute_jac_loss,
                                     f_thres=f_thres, b_thres=b_thres, writer=writer)
         target = target.cuda(non_blocking=True)
@@ -118,7 +120,7 @@ def train(config, train_loader, model, criterion, optimizer, lr_scheduler, epoch
 
 
 def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_dir, tb_log_dir,
-             writer_dict=None, topk=(1,5), spectral_radius_mode=False):
+             writer_dict=None, topk=(1,5), spectral_radius_mode=False, save_logits=True):
     batch_time = AverageMeter()
     losses = AverageMeter()
     spectral_radius_mode = spectral_radius_mode and (epoch % 10 == 0)
@@ -131,17 +133,21 @@ def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_d
     # switch to evaluate mode
     model.eval()
 
+    logits, targets = [], []
     with torch.no_grad():
         end = time.time()
         # tk0 = tqdm(enumerate(val_loader), total=len(val_loader), position=0, leave=True)
         for i, (input, target) in enumerate(val_loader):
             # compute output
-            output, _, sradius = model(input, 
+            output, _, sradius, output_all = model(input, 
                                  train_step=(-1 if epoch < 0 else (lr_scheduler._step_count-1)),
                                  compute_jac_loss=False, spectral_radius_mode=spectral_radius_mode,
                                  writer=writer)
             target = target.cuda(non_blocking=True)
             loss = criterion(output, target)
+
+            logits.append([x.detach().cpu() for x in output_all])
+            targets.append(target.detach().cpu())
 
             # measure accuracy and record loss
             losses.update(loss.item(), input.size(0))
@@ -171,5 +177,10 @@ def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_d
         writer.add_scalar('accuracy/valid_top1', top1.avg, epoch)
         if spectral_radius_mode:
             writer.add_scalar('stability/sradius', sradiuses.avg, epoch)
+
+    if save_logits:
+        with open("cifar10_LARGE.pkl", "wb") as f:
+            pickle.dump((logits, targets), f)
+    
 
     return top1.avg
